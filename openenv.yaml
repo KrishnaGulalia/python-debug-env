@@ -1,0 +1,74 @@
+name: python-debug-env
+version: "1.0.0"
+description: >
+  An OpenEnv environment where an AI agent is given buggy Python functions
+  and must return corrected code. Tasks range from simple syntax errors (easy)
+  to algorithmic bugs in DSA problems (hard). Grading is deterministic:
+  reward = fraction of test cases passed (0.0 – 1.0).
+
+author: ""
+tags:
+  - code-repair
+  - debugging
+  - python
+  - software-engineering
+
+tasks:
+  - id: easy_sum_list
+    name: Fix Syntax Error — sum_list
+    difficulty: easy
+    description: >
+      Fix a syntax error in a function that sums a list of numbers.
+      Expected score for a correct fix: 1.0
+
+  - id: medium_palindrome
+    name: Fix Logic Error — is_palindrome
+    difficulty: medium
+    description: >
+      Fix an off-by-one index error in a palindrome-checking function.
+      Expected score for a correct fix: 1.0
+
+  - id: hard_binary_search
+    name: Fix Algorithmic Bug — binary_search
+    difficulty: hard
+    description: >
+      Fix two bugs in a binary search implementation: wrong right boundary
+      and a potential index-out-of-bounds. Challenges even frontier models.
+      Expected score for a correct fix: 1.0
+
+observation_space:
+  type: object
+  fields:
+    task_id: string
+    difficulty: "easy | medium | hard"
+    buggy_code: string
+    description: string
+    function_signature: string
+    test_cases: "list of {input, expected}"
+    feedback: "string or null — test results from last attempt"
+    attempt: integer
+
+action_space:
+  type: object
+  fields:
+    fixed_code: string   # agent's corrected Python code
+
+reward:
+  type: float
+  range: [0.0, 1.0]
+  description: >
+    Fraction of test cases passed by the submitted code.
+    Provides dense partial-progress signal at every step.
+
+episode:
+  max_steps: 5
+  termination: "perfect score (1.0) OR max_steps reached"
+
+server:
+  port: 8000
+  endpoints:
+    - POST /reset
+    - POST /step
+    - GET  /state
+    - GET  /health
+    - GET  /tasks
