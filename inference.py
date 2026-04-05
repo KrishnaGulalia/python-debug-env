@@ -31,7 +31,12 @@ TEMPERATURE = 0.2
 MAX_TOKENS  = 1024
 SUCCESS_SCORE_THRESHOLD = 0.5   # score >= this → success
 
-TASKS = ["easy_sum_list", "easy_count_evens", "medium_palindrome", "medium_count_vowels", "hard_binary_search", "hard_merge_sort"]
+TASKS = [
+    "easy_sum_list", "easy_count_evens",
+    "medium_palindrome", "medium_count_vowels",
+    "hard_binary_search", "hard_merge_sort",
+    "hard_can_partition", "hard_min_edit_distance"
+]
 
 
 #  Logging helpers (mandatory stdout format)
