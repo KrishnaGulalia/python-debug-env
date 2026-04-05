@@ -7,6 +7,17 @@ name = "python-debug-env"
 version = "1.0.0"
 description = "OpenEnv environment for debugging Python code"
 requires-python = ">=3.11"
+dependencies = [
+    "openenv-core>=0.2.0",
+    "fastapi==0.111.0",
+    "uvicorn[standard]==0.30.1",
+    "pydantic==2.7.1",
+    "requests==2.32.3",
+    "pyyaml==6.0.1",
+]
+
+[project.scripts]
+server = "server:app"
 
 [tool.openenv]
 name = "python-debug-env"
