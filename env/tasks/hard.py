@@ -113,6 +113,122 @@ def merge(left, right):
             {"input": ([-3, 0, -1, 2],),             "expected": [-3, -1, 0, 2]},
         ],
     },
+    {
+        "id": "hard_can_partition",
+        "difficulty": "hard",
+        "description": (
+            "Fix the function `can_partition` that determines if an array can be "
+            "partitioned into two subsets with equal sum. "
+            "The inner loop iterates in the wrong direction — it goes forward instead "
+            "of backward, causing elements to be reused multiple times (unbounded knapsack "
+            "behaviour instead of 0/1 knapsack). This makes the function incorrectly return "
+            "True for inputs that should return False."
+        ),
+        "function_signature": "def can_partition(nums: list) -> bool",
+        "buggy_code": """\
+def can_partition(nums):
+    total = sum(nums)
+    if total % 2 != 0:
+        return False
+
+    target = total // 2
+    dp = [False] * (target + 1)
+    dp[0] = True
+
+    for num in nums:
+        for j in range(num, target + 1):   # BUG: forward loop reuses elements
+            dp[j] = dp[j] or dp[j - num]
+
+    return dp[target]
+""",
+        "solution": """\
+def can_partition(nums):
+    total = sum(nums)
+    if total % 2 != 0:
+        return False
+
+    target = total // 2
+    dp = [False] * (target + 1)
+    dp[0] = True
+
+    for num in nums:
+        for j in range(target, num - 1, -1):   # iterate backwards: 0/1 knapsack
+            dp[j] = dp[j] or dp[j - num]
+
+    return dp[target]
+""",
+        "test_cases": [
+            {"input": ([1, 5, 11, 5],),  "expected": True},
+            {"input": ([1, 2, 3, 5],),   "expected": False},
+            {"input": ([1, 1],),          "expected": True},
+            {"input": ([1, 2, 5],),      "expected": False},
+            {"input": ([3, 1],),         "expected": False},
+            {"input": ([2, 2, 4],),      "expected": True},
+            {"input": ([1, 3],),         "expected": False},
+            {"input": ([100],),          "expected": False},
+        ],
+    },
+    {
+        "id": "hard_min_edit_distance",
+        "difficulty": "hard",
+        "description": (
+            "Fix the function `min_edit_distance` that computes the Levenshtein "
+            "(edit) distance between two strings using dynamic programming. "
+            "The DP table is missing its base case initialization: the first column "
+            "should be filled with range(m+1) and the first row with range(n+1), "
+            "representing the cost of converting to/from an empty string. "
+            "Without this, the function returns wrong results whenever either string "
+            "is empty or a prefix must be deleted/inserted."
+        ),
+        "function_signature": "def min_edit_distance(word1: str, word2: str) -> int",
+        "buggy_code": """\
+def min_edit_distance(word1, word2):
+    m, n = len(word1), len(word2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+
+    # BUG: missing base case initialization:
+    #   for i in range(m + 1): dp[i][0] = i
+    #   for j in range(n + 1): dp[0][j] = j
+
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if word1[i-1] == word2[j-1]:
+                dp[i][j] = dp[i-1][j-1]
+            else:
+                dp[i][j] = 1 + min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
+
+    return dp[m][n]
+""",
+        "solution": """\
+def min_edit_distance(word1, word2):
+    m, n = len(word1), len(word2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+
+    for i in range(m + 1):
+        dp[i][0] = i
+    for j in range(n + 1):
+        dp[0][j] = j
+
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if word1[i-1] == word2[j-1]:
+                dp[i][j] = dp[i-1][j-1]
+            else:
+                dp[i][j] = 1 + min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
+
+    return dp[m][n]
+""",
+        "test_cases": [
+            {"input": ("horse",     "ros"),       "expected": 3},
+            {"input": ("intention", "execution"), "expected": 5},
+            {"input": ("",          "abc"),       "expected": 3},
+            {"input": ("abc",       ""),          "expected": 3},
+            {"input": ("abc",       "abc"),       "expected": 0},
+            {"input": ("a",         "b"),         "expected": 1},
+            {"input": ("kitten",    "sitting"),   "expected": 3},
+            {"input": ("ab",        "bc"),        "expected": 2},
+        ],
+    },
 ]
 
 HARD_TASK_BY_ID = {t["id"]: t for t in HARD_TASKS}
