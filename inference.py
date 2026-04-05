@@ -19,7 +19,7 @@ import requests
 from typing import List, Optional
 from openai import OpenAI
 
-# ─── Configuration ───────────────────────────────────────────────
+# Configuration 
 API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
@@ -34,7 +34,7 @@ SUCCESS_SCORE_THRESHOLD = 0.5   # score >= this → success
 TASKS = ["easy_sum_list", "easy_count_evens", "medium_palindrome", "medium_count_vowels", "hard_binary_search", "hard_merge_sort"]
 
 
-# ─── Logging helpers (mandatory stdout format) ───────────────────
+#  Logging helpers (mandatory stdout format)
 
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
@@ -61,7 +61,7 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
     )
 
 
-# ─── Environment HTTP helpers ─────────────────────────────────────
+#  Environment HTTP helpers
 
 def env_reset(task_id: str) -> dict:
     resp = requests.post(f"{ENV_BASE_URL}/reset", json={"task_id": task_id}, timeout=30)
@@ -75,7 +75,7 @@ def env_step(fixed_code: str) -> dict:
     return resp.json()
 
 
-# ─── LLM prompt builder ──────────────────────────────────────────
+# LLM prompt builder 
 
 SYSTEM_PROMPT = textwrap.dedent("""\
     You are an expert Python programmer.
@@ -144,7 +144,7 @@ def get_fixed_code(client: OpenAI, obs: dict, attempt: int) -> str:
         return obs["buggy_code"]
 
 
-# ─── Run one task episode ─────────────────────────────────────────
+#  Run one task episode
 
 def run_task(client: OpenAI, task_id: str) -> dict:
     """
@@ -204,7 +204,7 @@ def run_task(client: OpenAI, task_id: str) -> dict:
     return {"task_id": task_id, "score": score, "success": success}
 
 
-# ─── Main ────────────────────────────────────────────────────────
+#  Main
 
 def main():
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)

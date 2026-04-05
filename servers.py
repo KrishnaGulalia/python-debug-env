@@ -30,9 +30,9 @@ class ResetRequest(BaseModel):
     task_id: Optional[str] = None
 
 
-# ──────────────────────────────────────────────────────────────────
+
 # Endpoints
-# ──────────────────────────────────────────────────────────────────
+
 
 @app.get("/health")
 def health():

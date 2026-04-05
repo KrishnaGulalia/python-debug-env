@@ -17,9 +17,8 @@ class PythonDebugEnv:
         self._done    = False
         self._cumulative_reward = 0.0
 
-    # ──────────────────────────────────────────────────────────────
+
     # Public OpenEnv API
-    # ──────────────────────────────────────────────────────────────
 
     def reset(self, task_id: Optional[str] = None) -> ResetResult:
         """Start a fresh episode. Returns the initial observation."""
@@ -75,9 +74,9 @@ class PythonDebugEnv:
             "max_attempts":      MAX_ATTEMPTS,
         }
 
-    # ──────────────────────────────────────────────────────────────
+
     # Internal helpers
-    # ──────────────────────────────────────────────────────────────
+
 
     def _make_observation(self, feedback: Optional[str]) -> DebugObservation:
         t = self._task

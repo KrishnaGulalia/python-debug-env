@@ -1,8 +1,8 @@
-# Python Debug Environment 🐛
+# Python Debug Environment 
 
 An **OpenEnv** environment where an AI agent is given buggy Python functions and must return corrected code.
 
----
+
 
 ## Environment Description
 
@@ -10,7 +10,7 @@ The agent receives a Python function with a deliberate bug and must submit a fix
 
 This models a real task that every developer does daily — **code debugging**.
 
----
+
 
 ## Action & Observation Spaces
 
@@ -37,7 +37,7 @@ This models a real task that every developer does daily — **code debugging**.
 - **Dense**: partial credit is awarded — fixing half the bugs scores 0.5
 - **Terminal**: episode ends on a perfect score of `1.0` or after `MAX_STEPS=5` attempts
 
----
+
 
 ## Tasks
 
@@ -54,7 +54,7 @@ This models a real task that every developer does daily — **code debugging**.
 | medium_palindrome | 1.00 |
 | hard_binary_search | 0.71 |
 
----
+
 
 ## Setup & Usage
 
@@ -98,7 +98,7 @@ export ENV_BASE_URL="http://localhost:8000"
 python inference.py
 ```
 
----
+
 
 ## API Reference
 
@@ -110,7 +110,7 @@ python inference.py
 | `/state` | GET | Current environment state |
 | `/tasks` | GET | List all tasks with metadata |
 
----
+
 
 ## Project Structure
 
