@@ -1,6 +1,6 @@
 """
 Inference Script — Python Debug Environment
-============================================
+=============================================
 Mandatory environment variables:
   API_BASE_URL   The API endpoint for the LLM.
   MODEL_NAME     The model identifier to use for inference.
@@ -15,38 +15,40 @@ STDOUT FORMAT (must match exactly):
 import os
 import sys
 import textwrap
-import requests
 from typing import List, Optional
-from openai import OpenAI
 
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or "dummy-key"
+# Configuration 
+API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or "dummy-key"
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://krishnagulalia-python-debug-env.hf.space") # running docker
+ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://krishnagulalia-python-debug-env.hf.space")
 
 BENCHMARK  = "python-debug-env"
 MAX_STEPS  = 5
 TEMPERATURE = 0.2
 MAX_TOKENS  = 1024
-SUCCESS_SCORE_THRESHOLD = 0.5   # score >= this → success
+SUCCESS_SCORE_THRESHOLD = 0.5
 
 TASKS = [
-    "easy_sum_list", "easy_count_evens",
-    "medium_palindrome", "medium_count_vowels",
-    "hard_binary_search", "hard_merge_sort",
-    "hard_can_partition", "hard_min_edit_distance"
+    "easy_sum_list",
+    "easy_count_evens",
+    "medium_palindrome",
+    "medium_count_vowels",
+    "hard_binary_search",
+    "hard_merge_sort",
+    "hard_can_partition",
+    "hard_min_edit_distance",
 ]
 
 
-#  Logging helpers (mandatory stdout format)
+# Logging helpers (mandatory stdout format) 
 
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
-    # Compact the action to avoid newlines in the log line
-    action_compact = action.replace("\n", "\\n").replace("\r", "")
+    action_compact = str(action).replace("\n", "\\n").replace("\r", "")[:200]
     error_val = error if error else "null"
     done_val  = str(done).lower()
     print(
@@ -57,7 +59,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
 
 
 def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
     print(
         f"[END] success={str(success).lower()} steps={steps} "
         f"score={score:.3f} rewards={rewards_str}",
@@ -65,65 +67,65 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
     )
 
 
-#  Environment HTTP helpers
+#Environment HTTP helpers 
 
 def env_reset(task_id: str) -> dict:
-    resp = requests.post(f"{ENV_BASE_URL}/reset", json={"task_id": task_id}, timeout=30)
+    import requests
+    resp = requests.post(
+        f"{ENV_BASE_URL}/reset",
+        json={"task_id": task_id},
+        timeout=60,
+    )
     resp.raise_for_status()
     return resp.json()
 
 
 def env_step(fixed_code: str) -> dict:
-    resp = requests.post(f"{ENV_BASE_URL}/step", json={"fixed_code": fixed_code}, timeout=30)
+    import requests
+    resp = requests.post(
+        f"{ENV_BASE_URL}/step",
+        json={"fixed_code": fixed_code},
+        timeout=60,
+    )
     resp.raise_for_status()
     return resp.json()
 
 
-# LLM prompt builder 
+# LLM helpers 
 
 SYSTEM_PROMPT = textwrap.dedent("""\
     You are an expert Python programmer.
-    You will receive a buggy Python function and your job is to return the FIXED version.
-
-    Rules:
-    - Return ONLY the corrected Python code — no explanations, no markdown fences.
-    - Keep the function name exactly the same.
-    - Do not add extra functions or imports unless strictly necessary.
-    - If you see feedback from previous attempts, use it to fix the remaining failures.
+    Return ONLY the corrected Python code — no explanations, no markdown fences.
+    Keep the function name exactly the same.
 """)
 
 
 def build_user_prompt(obs: dict, attempt: int) -> str:
-    test_cases_str = "\n".join(
-        f"  Input: {tc['input']}  →  Expected: {tc['expected']}"
-        for tc in obs["test_cases"]
-    )
-    feedback_section = (
-        f"\nFeedback from last attempt:\n{obs['feedback']}\n"
-        if obs.get("feedback") else ""
-    )
-    return textwrap.dedent(f"""\
-        Task: {obs['description']}
-        Difficulty: {obs['difficulty']}
-
-        Buggy code:
-        ```python
-        {obs['buggy_code']}
-        ```
-
-        Function signature to implement:
-        {obs['function_signature']}
-
-        Test cases:
-        {test_cases_str}
-        {feedback_section}
-        Attempt {attempt} — return ONLY the corrected Python code:
-    """)
-
-
-def get_fixed_code(client: OpenAI, obs: dict, attempt: int) -> str:
-    user_prompt = build_user_prompt(obs, attempt)
     try:
+        test_cases_str = "\n".join(
+            f"  Input: {tc['input']}  ->  Expected: {tc['expected']}"
+            for tc in obs.get("test_cases", [])
+        )
+        feedback_section = (
+            f"\nFeedback from last attempt:\n{obs['feedback']}\n"
+            if obs.get("feedback") else ""
+        )
+        return (
+            f"Task: {obs.get('description', '')}\n"
+            f"Difficulty: {obs.get('difficulty', '')}\n\n"
+            f"Buggy code:\n{obs.get('buggy_code', '')}\n\n"
+            f"Function signature: {obs.get('function_signature', '')}\n\n"
+            f"Test cases:\n{test_cases_str}\n"
+            f"{feedback_section}"
+            f"Attempt {attempt} — return ONLY the corrected Python code:"
+        )
+    except Exception:
+        return f"Fix this buggy Python code:\n{obs.get('buggy_code', '')}"
+
+
+def get_fixed_code(client, obs: dict, attempt: int) -> str:
+    try:
+        user_prompt = build_user_prompt(obs, attempt)
         completion = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
@@ -135,37 +137,31 @@ def get_fixed_code(client: OpenAI, obs: dict, attempt: int) -> str:
             stream=False,
         )
         text = (completion.choices[0].message.content or "").strip()
-        # Strip markdown fences if model added them anyway
         if text.startswith("```python"):
             text = text[len("```python"):].strip()
         if text.startswith("```"):
             text = text[3:].strip()
         if text.endswith("```"):
             text = text[:-3].strip()
-        return text if text else obs["buggy_code"]   # fallback: return unchanged
+        return text if text else obs.get("buggy_code", "")
     except Exception as exc:
         print(f"[DEBUG] LLM request failed: {exc}", flush=True)
-        return obs["buggy_code"]
+        return obs.get("buggy_code", "")
 
 
-#  Run one task episode
+# Run one task episode 
 
-def run_task(client: OpenAI, task_id: str) -> dict:
-    """
-    Run a full episode for one task.
-    Returns {score, success, steps, rewards}
-    """
+def run_task(client, task_id: str) -> dict:
     rewards: List[float] = []
     steps_taken = 0
     score = 0.0
     success = False
-    error_msg = None
 
     log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     try:
         reset_result = env_reset(task_id)
-        obs = reset_result["observation"]
+        obs  = reset_result.get("observation", {})
         done = reset_result.get("done", False)
 
         for step in range(1, MAX_STEPS + 1):
@@ -173,17 +169,17 @@ def run_task(client: OpenAI, task_id: str) -> dict:
                 break
 
             fixed_code = get_fixed_code(client, obs, attempt=step)
+            error_msg  = None
 
             try:
                 step_result = env_step(fixed_code)
-                reward = step_result.get("reward", 0.0)
+                reward = float(step_result.get("reward", 0.0))
                 done   = step_result.get("done", False)
-                obs    = step_result["observation"]
-                error_msg = None
+                obs    = step_result.get("observation", obs)
             except Exception as e:
-                reward = 0.0
-                done   = True
-                error_msg = str(e)
+                reward    = 0.0
+                done      = True
+                error_msg = str(e)[:100]
 
             rewards.append(reward)
             steps_taken = step
@@ -192,33 +188,40 @@ def run_task(client: OpenAI, task_id: str) -> dict:
             if done:
                 break
 
-        score   = max(rewards) if rewards else 0.0   # best attempt score
+        score   = max(rewards) if rewards else 0.0
         score   = min(max(score, 0.0), 1.0)
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as outer_exc:
-        print(f"[DEBUG] Episode error: {outer_exc}", flush=True)
+        print(f"[DEBUG] Episode error for {task_id}: {outer_exc}", flush=True)
         if not rewards:
             rewards = [0.0]
-        steps_taken = steps_taken or 1
-        score = 0.0
+        steps_taken = max(steps_taken, 1)
+        score   = 0.0
         success = False
 
-    log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+    finally:
+        # [END] MUST always be emitted — even on exception
+        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+
     return {"task_id": task_id, "score": score, "success": success}
 
 
-#  Main
+# Main
 
 def main():
     try:
+        from openai import OpenAI
         client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
     except Exception as e:
         print(f"[DEBUG] Failed to create OpenAI client: {e}", flush=True)
+        for task_id in TASKS:
+            log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
+            log_end(success=False, steps=1, score=0.0, rewards=[0.0])
         sys.exit(1)
-    
-    print(f"[DEBUG] Running {len(TASKS)} tasks against {ENV_BASE_URL}", flush=True)
-    print(f"[DEBUG] Model: {MODEL_NAME}", flush=True)
+
+    print(f"[DEBUG] ENV_BASE_URL={ENV_BASE_URL}", flush=True)
+    print(f"[DEBUG] MODEL={MODEL_NAME}", flush=True)
 
     results = []
     for task_id in TASKS:
@@ -226,15 +229,14 @@ def main():
         result = run_task(client, task_id)
         results.append(result)
 
-    # Summary
     print(f"\n{'='*60}", flush=True)
     print("[SUMMARY]", flush=True)
     for r in results:
         status = "✓" if r["success"] else "✗"
-        print(f"  {status}  {r['task_id']:30s}  score={r['score']:.3f}", flush=True)
+        print(f"  {status}  {r['task_id']:40s}  score={r['score']:.3f}", flush=True)
 
-    avg_score = sum(r["score"] for r in results) / len(results)
-    print(f"\n  Average score: {avg_score:.3f}", flush=True)
+    avg = sum(r["score"] for r in results) / len(results)
+    print(f"\n  Average score: {avg:.3f}", flush=True)
 
 
 if __name__ == "__main__":
