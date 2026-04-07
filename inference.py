@@ -19,11 +19,10 @@ import requests
 from typing import List, Optional
 from openai import OpenAI
 
-# Configuration 
-API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or "dummy-key"
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
-ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:8000")  # running docker
+ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://krishnagulalia-python-debug-env.hf.space") # running docker
 
 BENCHMARK  = "python-debug-env"
 MAX_STEPS  = 5
@@ -212,8 +211,12 @@ def run_task(client: OpenAI, task_id: str) -> dict:
 #  Main
 
 def main():
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-
+    try:
+        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    except Exception as e:
+        print(f"[DEBUG] Failed to create OpenAI client: {e}", flush=True)
+        sys.exit(1)
+    
     print(f"[DEBUG] Running {len(TASKS)} tasks against {ENV_BASE_URL}", flush=True)
     print(f"[DEBUG] Model: {MODEL_NAME}", flush=True)
 
