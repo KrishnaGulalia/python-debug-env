@@ -4,8 +4,8 @@ import textwrap
 from typing import List, Optional
 
 # Configuration 
-API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or "dummy-key"
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+API_KEY      = os.environ.get("API_KEY") or os.environ.get("HF_TOKEN")
+API_BASE_URL = os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://krishnagulalia-python-debug-env.hf.space")
 
@@ -207,7 +207,10 @@ def run_task(client, task_id: str) -> dict:
 def main():
     try:
         from openai import OpenAI
-        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+        client = OpenAI(
+        base_url=API_BASE_URL,
+        api_key=API_KEY if API_KEY else "required",
+        )
     except Exception as e:
         print(f"[DEBUG] OpenAI init failed: {e}", flush=True)
         client = None
