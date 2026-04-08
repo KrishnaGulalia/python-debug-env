@@ -3,6 +3,7 @@ Core logic for the Python Debug Environment.
 Handles state, stepping, resetting, and reward calculation.
 """
 
+from curses import raw
 from typing import Optional
 from env.models import DebugObservation, DebugAction, StepResult, ResetResult
 from env.tasks  import ALL_TASKS, TASK_BY_ID
@@ -137,6 +138,7 @@ class PythonDebugEnv:
             except Exception as e:
                 feedback_lines.append(f"Test {i+1}: RUNTIME ERROR — {e}")
 
-        reward   = round(passed / total, 4) if total > 0 else 0.0
+        raw = passed / total if total > 0 else 0.0
+        reward = round(min(max(raw, 0.001), 0.999), 4)
         feedback = "\n".join(feedback_lines)
         return reward, passed, total, feedback
