@@ -1,24 +1,18 @@
 import os
+import sys
 import textwrap
 from typing import List, Optional
 
-
-# SAFE CONFIG (NO BYPASS)
-
-API_KEY = os.getenv("API_KEY")
+# Configuration 
+API_KEY      = os.getenv("API_KEY")
 API_BASE_URL = os.getenv("API_BASE_URL")
-
-if not API_KEY or not API_BASE_URL:
-    print("[FATAL] Missing API_KEY or API_BASE_URL", flush=True)
-    exit(1)
-
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+MODEL_NAME   = os.getenv("MODEL_NAME", "gpt-4o-mini")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://krishnagulalia-python-debug-env.hf.space")
 
-BENCHMARK = "python-debug-env"
-MAX_STEPS = 5
-TEMPERATURE = 0.2
-MAX_TOKENS = 1024
+BENCHMARK               = "python-debug-env"
+MAX_STEPS               = 5
+TEMPERATURE             = 0.2
+MAX_TOKENS              = 1024
 SUCCESS_SCORE_THRESHOLD = 0.5
 
 TASKS = [
@@ -33,8 +27,7 @@ TASKS = [
 ]
 
 
-
-# LOGGING (MANDATORY)
+#  Logging (mandatory stdout format) 
 
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
@@ -43,8 +36,7 @@ def log_start(task: str, env: str, model: str) -> None:
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     action_compact = str(action).replace("\n", "\\n").replace("\r", "")[:200]
     error_val = error if error else "null"
-    done_val = str(done).lower()
-
+    done_val  = str(done).lower()
     print(
         f"[STEP] step={step} action={action_compact!r} reward={reward:.2f} "
         f"done={done_val} error={error_val}",
@@ -54,7 +46,6 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
 
 def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
-
     print(
         f"[END] success={str(success).lower()} steps={steps} "
         f"score={score:.3f} rewards={rewards_str}",
@@ -62,8 +53,7 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
     )
 
 
-
-# ENV API CALLS
+# Environment HTTP helpers 
 
 def env_reset(task_id: str) -> dict:
     import requests
@@ -87,28 +77,25 @@ def env_step(fixed_code: str) -> dict:
     return resp.json()
 
 
-
-# LLM PROMPTING
+# LLM helpers 
 
 SYSTEM_PROMPT = textwrap.dedent("""\
-You are an expert Python programmer.
-Return ONLY the corrected Python code — no explanations, no markdown fences.
-Keep the function name exactly the same.
+    You are an expert Python programmer.
+    Return ONLY the corrected Python code — no explanations, no markdown fences.
+    Keep the function name exactly the same.
 """)
 
 
 def build_user_prompt(obs: dict, attempt: int) -> str:
     try:
         test_cases_str = "\n".join(
-            f"Input: {tc['input']} -> Expected: {tc['expected']}"
+            f"  Input: {tc['input']}  ->  Expected: {tc['expected']}"
             for tc in obs.get("test_cases", [])
         )
-
         feedback_section = (
             f"\nFeedback from last attempt:\n{obs['feedback']}\n"
             if obs.get("feedback") else ""
         )
-
         return (
             f"Task: {obs.get('description', '')}\n"
             f"Difficulty: {obs.get('difficulty', '')}\n\n"
@@ -123,49 +110,48 @@ def build_user_prompt(obs: dict, attempt: int) -> str:
 
 
 def get_fixed_code(client, obs: dict, attempt: int) -> str:
+    # If no client, return buggy code as fallback (still emits steps)
+    if client is None:
+        return obs.get("buggy_code", "")
     try:
         user_prompt = build_user_prompt(obs, attempt)
-
         completion = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
+                {"role": "user",   "content": user_prompt},
             ],
             temperature=TEMPERATURE,
             max_tokens=MAX_TOKENS,
         )
-
         text = (completion.choices[0].message.content or "").strip()
-
+        # Strip markdown fences if model added them
         if text.startswith("```python"):
             text = text[len("```python"):].strip()
         if text.startswith("```"):
             text = text[3:].strip()
         if text.endswith("```"):
             text = text[:-3].strip()
-
         return text if text else obs.get("buggy_code", "")
-
     except Exception as exc:
         print(f"[DEBUG] LLM request failed: {exc}", flush=True)
         return obs.get("buggy_code", "")
 
 
-
-# TASK EXECUTION
+# Task execution
 
 def run_task(client, task_id: str) -> dict:
     rewards: List[float] = []
     steps_taken = 0
-    score = 0.0
+    score   = 0.0
     success = False
 
+    # [START] must always be printed
     log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     try:
         reset_result = env_reset(task_id)
-        obs = reset_result.get("observation", {})
+        obs  = reset_result.get("observation", {})
         done = reset_result.get("done", False)
 
         for step in range(1, MAX_STEPS + 1):
@@ -173,29 +159,28 @@ def run_task(client, task_id: str) -> dict:
                 break
 
             fixed_code = get_fixed_code(client, obs, attempt=step)
-
-            error_msg = None
+            error_msg  = None
 
             try:
                 step_result = env_step(fixed_code)
                 reward = float(step_result.get("reward", 0.0))
-                done = step_result.get("done", False)
-                obs = step_result.get("observation", obs)
+                done   = step_result.get("done", False)
+                obs    = step_result.get("observation", obs)
             except Exception as e:
-                reward = 0.0
-                done = True
+                reward    = 0.0
+                done      = True
                 error_msg = str(e)[:100]
 
             rewards.append(reward)
             steps_taken = step
-
+            # [STEP] must always be printed
             log_step(step, fixed_code, reward, done, error_msg)
 
             if done:
                 break
 
-        score = max(rewards) if rewards else 0.0
-        score = min(max(score, 0.0), 1.0)
+        score   = max(rewards) if rewards else 0.0
+        score   = min(max(score, 0.0), 1.0)
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as outer_exc:
@@ -203,37 +188,35 @@ def run_task(client, task_id: str) -> dict:
         if not rewards:
             rewards = [0.0]
         steps_taken = max(steps_taken, 1)
-        score = 0.0
+        score   = 0.0
         success = False
 
     finally:
+        # [END] MUST always be printed — even on any exception
         log_end(success, steps_taken, score, rewards)
 
     return {"task_id": task_id, "score": score, "success": success}
 
 
-
-# MAIN
+#  Main 
 
 def main():
     from openai import OpenAI
 
-    print("[DEBUG] Starting execution", flush=True)
-
-    try:
-        client = OpenAI(
-            base_url=API_BASE_URL,
-            api_key=API_KEY,
-        )
-    except Exception as e:
-        print(f"[FATAL] OpenAI init failed: {e}", flush=True)
-        return
-
-    print(f"[DEBUG] ENV_BASE_URL={ENV_BASE_URL}", flush=True)
+    print("[DEBUG] Starting inference", flush=True)
+    print(f"[DEBUG] API_BASE_URL={API_BASE_URL}", flush=True)
     print(f"[DEBUG] MODEL={MODEL_NAME}", flush=True)
+    print(f"[DEBUG] ENV_BASE_URL={ENV_BASE_URL}", flush=True)
+
+    # Try to create client — but NEVER exit early if it fails
+    client = None
+    try:
+        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+        print("[DEBUG] OpenAI client created OK", flush=True)
+    except Exception as e:
+        print(f"[DEBUG] OpenAI client failed: {e} — will run with fallback", flush=True)
 
     results = []
-
     for task_id in TASKS:
         print(f"\n{'='*60}", flush=True)
         result = run_task(client, task_id)
@@ -241,7 +224,6 @@ def main():
 
     print(f"\n{'='*60}", flush=True)
     print("[SUMMARY]", flush=True)
-
     for r in results:
         status = "✓" if r["success"] else "✗"
         print(f"  {status}  {r['task_id']:40s}  score={r['score']:.3f}", flush=True)
@@ -251,4 +233,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as fatal:
+        print(f"[FATAL] {fatal}", flush=True)
+        # Absolute last resort — emit valid structured output for all tasks
+        for task_id in TASKS:
+            log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME or "unknown")
+            log_step(1, "error", 0.0, True, str(fatal)[:100])
+            log_end(False, 1, 0.0, [0.0])
+        sys.exit(1)
