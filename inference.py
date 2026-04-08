@@ -3,10 +3,14 @@ import textwrap
 from typing import List, Optional
 
 
-# STRICT CONFIG (NO FALLBACKS)
+# SAFE CONFIG (NO BYPASS)
 
-API_KEY = os.environ["API_KEY"]
-API_BASE_URL = os.environ["API_BASE_URL"]
+API_KEY = os.getenv("API_KEY")
+API_BASE_URL = os.getenv("API_BASE_URL")
+
+if not API_KEY or not API_BASE_URL:
+    print("[FATAL] Missing API_KEY or API_BASE_URL", flush=True)
+    exit(1)
 
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://krishnagulalia-python-debug-env.hf.space")
@@ -134,7 +138,6 @@ def get_fixed_code(client, obs: dict, attempt: int) -> str:
 
         text = (completion.choices[0].message.content or "").strip()
 
-        # Clean markdown if model adds it
         if text.startswith("```python"):
             text = text[len("```python"):].strip()
         if text.startswith("```"):
@@ -210,17 +213,21 @@ def run_task(client, task_id: str) -> dict:
 
 
 
-# MAIN ENTRY (CRITICAL)
+# MAIN
 
 def main():
     from openai import OpenAI
 
     print("[DEBUG] Starting execution", flush=True)
 
-    client = OpenAI(
-        base_url=API_BASE_URL,
-        api_key=API_KEY,
-    )
+    try:
+        client = OpenAI(
+            base_url=API_BASE_URL,
+            api_key=API_KEY,
+        )
+    except Exception as e:
+        print(f"[FATAL] OpenAI init failed: {e}", flush=True)
+        return
 
     print(f"[DEBUG] ENV_BASE_URL={ENV_BASE_URL}", flush=True)
     print(f"[DEBUG] MODEL={MODEL_NAME}", flush=True)
