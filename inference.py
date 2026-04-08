@@ -1,7 +1,7 @@
 import os
-import sys
 import textwrap
 from typing import List, Optional
+
 
 # STRICT CONFIG (NO FALLBACKS)
 
@@ -30,7 +30,7 @@ TASKS = [
 
 
 
-# LOGGING (DO NOT TOUCH)
+# LOGGING (MANDATORY)
 
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
@@ -40,6 +40,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     action_compact = str(action).replace("\n", "\\n").replace("\r", "")[:200]
     error_val = error if error else "null"
     done_val = str(done).lower()
+
     print(
         f"[STEP] step={step} action={action_compact!r} reward={reward:.2f} "
         f"done={done_val} error={error_val}",
@@ -49,6 +50,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
 
 def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
+
     print(
         f"[END] success={str(success).lower()} steps={steps} "
         f"score={score:.3f} rewards={rewards_str}",
@@ -57,7 +59,7 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
 
 
 
-# ENV CALLS
+# ENV API CALLS
 
 def env_reset(task_id: str) -> dict:
     import requests
@@ -82,7 +84,7 @@ def env_step(fixed_code: str) -> dict:
 
 
 
-# LLM PROMPTS
+# LLM PROMPTING
 
 SYSTEM_PROMPT = textwrap.dedent("""\
 You are an expert Python programmer.
@@ -148,7 +150,7 @@ def get_fixed_code(client, obs: dict, attempt: int) -> str:
 
 
 
-# TASK RUNNER
+# TASK EXECUTION
 
 def run_task(client, task_id: str) -> dict:
     rewards: List[float] = []
@@ -208,12 +210,13 @@ def run_task(client, task_id: str) -> dict:
 
 
 
-# MAIN
+# MAIN ENTRY (CRITICAL)
 
 def main():
     from openai import OpenAI
 
-    # MUST use provided proxy
+    print("[DEBUG] Starting execution", flush=True)
+
     client = OpenAI(
         base_url=API_BASE_URL,
         api_key=API_KEY,
@@ -241,7 +244,4 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"[FATAL] {e}", flush=True)
+    main()
