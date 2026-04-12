@@ -3,7 +3,6 @@ Core logic for the Python Debug Environment.
 Handles state, stepping, resetting, and reward calculation.
 """
 
-from curses import raw
 from typing import Optional
 from env.models import DebugObservation, DebugAction, StepResult, ResetResult
 from env.tasks  import ALL_TASKS, TASK_BY_ID
@@ -20,6 +19,7 @@ class PythonDebugEnv:
 
 
     # Public OpenEnv API
+    
 
     def reset(self, task_id: Optional[str] = None) -> ResetResult:
         """Start a fresh episode. Returns the initial observation."""
@@ -75,9 +75,9 @@ class PythonDebugEnv:
             "max_attempts":      MAX_ATTEMPTS,
         }
 
-
+   
     # Internal helpers
-
+   
 
     def _make_observation(self, feedback: Optional[str]) -> DebugObservation:
         t = self._task
@@ -138,7 +138,7 @@ class PythonDebugEnv:
             except Exception as e:
                 feedback_lines.append(f"Test {i+1}: RUNTIME ERROR — {e}")
 
-        raw = passed / total if total > 0 else 0.0
-        reward = round(min(max(raw, 0.001), 0.999), 4)
+        raw      = passed / total if total > 0 else 0.0
+        reward   = round(min(max(raw, 0.001), 0.999), 4)
         feedback = "\n".join(feedback_lines)
         return reward, passed, total, feedback

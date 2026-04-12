@@ -3,11 +3,15 @@ import sys
 import textwrap
 from typing import List, Optional
 
-# Configuration 
-API_KEY      = os.getenv("API_KEY")
-API_BASE_URL = os.getenv("API_BASE_URL")
-MODEL_NAME   = os.getenv("MODEL_NAME", "gpt-4o-mini")
+#  Configuration (per official guidelines) 
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN     = os.getenv("HF_TOKEN")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "https://krishnagulalia-python-debug-env.hf.space")
+
+if HF_TOKEN is None:
+    print("[DEBUG] HF_TOKEN not set — will attempt with empty key", flush=True)
+    HF_TOKEN = "missing"
 
 BENCHMARK               = "python-debug-env"
 MAX_STEPS               = 5
@@ -27,7 +31,11 @@ TASKS = [
 ]
 
 
-#  Logging (mandatory stdout format) 
+# Logging (MUST match spec exactly)
+# Spec: [START] task=X env=Y model=Z
+# Spec: [STEP]  step=N action=A reward=0.00 done=true|false error=X|null
+# Spec: [END]   success=true|false steps=N rewards=r1,r2,...
+# NOTE: NO score= field in [END]
 
 def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
@@ -44,16 +52,16 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     )
 
 
-def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+def log_end(success: bool, steps: int, rewards: List[float]) -> None:
+    # NO score= field — spec only has success, steps, rewards
     rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
     print(
-        f"[END] success={str(success).lower()} steps={steps} "
-        f"score={score:.3f} rewards={rewards_str}",
+        f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}",
         flush=True,
     )
 
 
-# Environment HTTP helpers 
+# Environment HTTP helpers
 
 def env_reset(task_id: str) -> dict:
     import requests
@@ -77,7 +85,7 @@ def env_step(fixed_code: str) -> dict:
     return resp.json()
 
 
-# LLM helpers 
+#LLM helpers
 
 SYSTEM_PROMPT = textwrap.dedent("""\
     You are an expert Python programmer.
@@ -110,7 +118,6 @@ def build_user_prompt(obs: dict, attempt: int) -> str:
 
 
 def get_fixed_code(client, obs: dict, attempt: int) -> str:
-    # If no client, return buggy code as fallback (still emits steps)
     if client is None:
         return obs.get("buggy_code", "")
     try:
@@ -125,7 +132,6 @@ def get_fixed_code(client, obs: dict, attempt: int) -> str:
             max_tokens=MAX_TOKENS,
         )
         text = (completion.choices[0].message.content or "").strip()
-        # Strip markdown fences if model added them
         if text.startswith("```python"):
             text = text[len("```python"):].strip()
         if text.startswith("```"):
@@ -138,7 +144,7 @@ def get_fixed_code(client, obs: dict, attempt: int) -> str:
         return obs.get("buggy_code", "")
 
 
-# Task execution
+# Task execution 
 
 def run_task(client, task_id: str) -> dict:
     rewards: List[float] = []
@@ -146,7 +152,6 @@ def run_task(client, task_id: str) -> dict:
     score   = 0.0
     success = False
 
-    # [START] must always be printed
     log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     try:
@@ -173,7 +178,6 @@ def run_task(client, task_id: str) -> dict:
 
             rewards.append(reward)
             steps_taken = step
-            # [STEP] must always be printed
             log_step(step, fixed_code, reward, done, error_msg)
 
             if done:
@@ -192,13 +196,13 @@ def run_task(client, task_id: str) -> dict:
         success = False
 
     finally:
-        # [END] MUST always be printed — even on any exception
-        log_end(success, steps_taken, score, rewards)
+        # [END] always emitted — no score= field per spec
+        log_end(success, steps_taken, rewards)
 
     return {"task_id": task_id, "score": score, "success": success}
 
 
-#  Main 
+# Main
 
 def main():
     from openai import OpenAI
@@ -208,13 +212,13 @@ def main():
     print(f"[DEBUG] MODEL={MODEL_NAME}", flush=True)
     print(f"[DEBUG] ENV_BASE_URL={ENV_BASE_URL}", flush=True)
 
-    # Try to create client — but NEVER exit early if it fails
+    # Initialize client with HF_TOKEN as api_key per official guidelines
     client = None
     try:
-        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+        client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
         print("[DEBUG] OpenAI client created OK", flush=True)
     except Exception as e:
-        print(f"[DEBUG] OpenAI client failed: {e} — will run with fallback", flush=True)
+        print(f"[DEBUG] OpenAI client failed: {e}", flush=True)
 
     results = []
     for task_id in TASKS:
@@ -237,9 +241,9 @@ if __name__ == "__main__":
         main()
     except Exception as fatal:
         print(f"[FATAL] {fatal}", flush=True)
-        # Absolute last resort — emit valid structured output for all tasks
+        # Last resort — always emit valid structured output
         for task_id in TASKS:
-            log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME or "unknown")
+            log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
             log_step(1, "error", 0.0, True, str(fatal)[:100])
-            log_end(False, 1, 0.0, [0.0])
+            log_end(False, 1, [0.0])
         sys.exit(1)
