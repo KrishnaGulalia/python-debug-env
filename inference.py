@@ -183,8 +183,13 @@ def run_task(client, task_id: str) -> dict:
             if done:
                 break
 
-        score   = max(rewards) if rewards else 0.0
-        score   = min(max(score, 0.0), 1.0)
+        score = max(rewards) if rewards else 0.0
+
+        # Ensure STRICTLY between (0,1)
+        if score <= 0.0:
+            score = 0.01
+        elif score >= 1.0:
+            score = 0.99
         success = score >= SUCCESS_SCORE_THRESHOLD
 
     except Exception as outer_exc:
